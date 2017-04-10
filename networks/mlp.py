@@ -277,6 +277,7 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     x = T.matrix('x')  # the data is presented as rasterized images
     y = T.ivector('y')  # the labels are presented as 1D vector of
                         # [int] labels
+    y_list = T.imatrix('y_list')  # labels list, presented as vectors
 
     rng = numpy.random.RandomState(1234)
 
@@ -301,13 +302,13 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     # compiling a Theano function that computes the mistakes that are made
     # by the model on a minibatch
     test_model = theano.function(
-        inputs = [x, y],
-        outputs = classifier.errors(y)
+        inputs = [x, y_list],
+        outputs = classifier.errors(y_list)
     )
 
     validate_model = theano.function(
-        inputs = [x, y],
-        outputs = classifier.errors(y)
+        inputs = [x, y_list],
+        outputs = classifier.errors(y_list)
     )
 
     # compute the gradient of cost with respect to theta (sorted in params)
@@ -367,8 +368,8 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
             
             next_train_batch = train_vectorizer.get_next_batch(batch_size = batch_size)
             train_features = next_train_batch[0].get_value(
-                borrow=True,
-                return_internal_type=True
+                borrow = True,
+                return_internal_type = True
             )
             train_labels = next_train_batch[1].eval()
             batch_avg_cost = train_model(train_features, train_labels)
@@ -386,8 +387,8 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
                         borrow=True,
                         return_internal_type=True
                     )
-                    valid_labels = next_valid_batch[1].eval()
-                    validation_losses.append(validate_model(valid_features, valid_labels))
+                    labels_list = next_train_batch[2].eval()
+                    validation_losses.append(validate_model(valid_features, labels_list))
                     
                 this_validation_loss = numpy.mean(validation_losses)
 
@@ -421,8 +422,8 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
                             borrow=True,
                             return_internal_type=True
                         )
-                        test_labels = next_test_batch[1].eval()
-                        test_losses.append(test_model(test_features, test_labels))
+                        labels_list = next_train_batch[2].eval()
+                        test_losses.append(test_model(test_features, labels_list))
 
                     test_score = numpy.mean(test_losses)
 

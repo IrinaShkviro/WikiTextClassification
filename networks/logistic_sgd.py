@@ -79,7 +79,7 @@ class LogisticRegression(object):
                       which the labels lie
 
         """
-        # start-snippet-1
+                
         # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
         self.W = theano.shared(
             value=numpy.zeros(
@@ -89,7 +89,7 @@ class LogisticRegression(object):
             name='W',
             borrow=True
         )
-        print((n_in, n_out))
+
         # initialize the biases b as a vector of n_out 0s
         self.b = theano.shared(
             value=numpy.zeros(
@@ -113,7 +113,6 @@ class LogisticRegression(object):
         # symbolic description of how to compute prediction as class whose
         # probability is maximal
         self.y_pred = T.argmax(self.p_y_given_x, axis=1)
-        # end-snippet-1
 
         # parameters of the model
         self.params = [self.W, self.b]
@@ -143,31 +142,20 @@ class LogisticRegression(object):
         # the mean (across minibatch examples) of the elements in v,
         # i.e., the mean log-likelihood across the minibatch.
         return -T.mean(T.log(self.p_y_given_x)[T.arange(y.shape[0]), y])
-
-    def errors(self, y):
+        
+    def errors(self, y_lists):
         """Return a float representing the number of errors in the minibatch
         over the total number of examples of the minibatch ; zero one
         loss over the size of the minibatch
 
-        :type y: theano.tensor.TensorType
-        :param y: corresponds to a vector that gives for each example the
+        :type y_lists: theano.tensor.TensorType
+        :param y_lists: corresponds to a list of vectors that gives for each example the
                   correct label
         """
-
-        # check if y has same dimension of y_pred
-        if y.ndim != self.y_pred.ndim:
-            raise TypeError(
-                'y should have the same shape as self.y_pred',
-                ('y', y.type, 'y_pred', self.y_pred.type)
-            )
-        # check if y is of the correct datatype
-        if y.dtype.startswith('int'):
-            # the T.neq operator returns a vector of 0s and 1s, where 1
-            # represents a mistake in prediction
-            return T.mean(T.neq(self.y_pred, y))
-        else:
-            raise NotImplementedError()
-
+            
+        return T.mean(1 - T.any(T.switch(T.eq(self.y_pred, T.transpose(y_lists)), 
+                                         T.ones_like(self.y_pred),
+                                        T.zeros_like(self.y_pred)), axis = 0))
 
 def load_data(vocab_dir = 'preproceed', train_dir = 'preproceed', vectorizer = MeanEmbeddingVectorizer):
     ''' Loads the dataset
@@ -248,6 +236,7 @@ def sgd_optimization(learning_rate=0.13, n_epochs=1000,
     # minibatch)
     x = T.matrix('x')  # data, presented as vectors
     y = T.ivector('y')  # labels, presented as int labels
+    y_list = T.imatrix('y_list')  # labels list, presented as vectors
 
     # construct the logistic regression class
     classifier = LogisticRegression(
@@ -263,20 +252,19 @@ def sgd_optimization(learning_rate=0.13, n_epochs=1000,
     # compiling a Theano function that computes the mistakes that are made by
     # the model on a minibatch
     test_model = theano.function(
-        inputs=[x, y],
-        outputs=classifier.errors(y),
+        inputs = [x, y_list],
+        outputs = classifier.errors(y_list),
     )
 
     validate_model = theano.function(
-        inputs=[x, y],
-        outputs=classifier.errors(y)
+        inputs = [x, y_list],
+        outputs = classifier.errors(y_list)
     )
 
     # compute the gradient of cost with respect to theta = (W,b)
     g_W = T.grad(cost = cost, wrt = classifier.W)
     g_b = T.grad(cost = cost, wrt = classifier.b)
 
-    # start-snippet-3
     # specify how to update the parameters of the model as a list of
     # (variable, update expression) pairs.
     updates = [(classifier.W, classifier.W - learning_rate * g_W),
@@ -296,7 +284,7 @@ def sgd_optimization(learning_rate=0.13, n_epochs=1000,
     ###############
     print('... training the model')
     # early-stopping parameters
-    patience = 5000  # look as this many examples regardless
+    patience = 1000  # look as this many examples regardless
     patience_increase = 2  # wait this much longer when a new best is
                                   # found
     improvement_threshold = 0.995  # a relative improvement of this much is
@@ -326,7 +314,6 @@ def sgd_optimization(learning_rate=0.13, n_epochs=1000,
             )
             train_labels = next_train_batch[1].eval()
             batch_avg_cost = train_model(train_features, train_labels)
-            #print(batch_avg_cost, 'cost')
             
             # iteration number
             iter = (epoch - 1) * n_train_batches + batch_id
@@ -341,8 +328,8 @@ def sgd_optimization(learning_rate=0.13, n_epochs=1000,
                         borrow=True,
                         return_internal_type=True
                     )
-                    valid_labels = next_valid_batch[1].eval()
-                    validation_losses.append(validate_model(valid_features, valid_labels))
+                    labels_list = next_train_batch[2].eval()
+                    validation_losses.append(validate_model(valid_features, labels_list))
                     
                 this_validation_loss = numpy.mean(validation_losses)
 
@@ -374,8 +361,8 @@ def sgd_optimization(learning_rate=0.13, n_epochs=1000,
                             borrow=True,
                             return_internal_type=True
                         )
-                        test_labels = next_test_batch[1].eval()
-                        test_losses.append(test_model(test_features, test_labels))
+                        labels_list = next_train_batch[2].eval()
+                        test_losses.append(test_model(test_features, labels_list))
 
                     test_score = numpy.mean(test_losses)
 

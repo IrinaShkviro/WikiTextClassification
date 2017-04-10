@@ -74,20 +74,23 @@ class TextVectorizer(object):
         self.cur_label_num = 0
         self.n_cur_labels = 0
         
+        self.max_len_list = 0
+        
     def calc_n_samples(self):
         n_samples = 0
-        n_diff_labels = set()
         for cur_doc in range(self.n_files):
             cur_doc_id = self.w2vmodel.get_next_doc_id()
             cur_label_list = self.train_dict.get(cur_doc_id)
             n_cur_labels = len(cur_label_list)
+            if n_cur_labels > self.max_len_list:
+                self.max_len_list = n_cur_labels
             n_samples = n_samples + n_cur_labels
         return n_samples            
         
     def get_next_pair(self):
         self.cur_label_num = self.cur_label_num + 1
         if self.cur_label_num <= self.n_cur_labels:
-            return (self.cur_x, self.cur_label_list[self.cur_label_num - 1])
+            return (self.cur_x, self.cur_label_list[self.cur_label_num - 1], self.cur_label_list)
         else:
             next_doc = self.get_next_doc_vector()
             self.cur_x = next_doc[0]
@@ -99,20 +102,32 @@ class TextVectorizer(object):
             
     def get_next_batch(self, batch_size):
         # x.shape = (200, )
-        (cur_x, cur_y) = self.get_next_pair()
+        (cur_x, cur_y, labels_list) = self.get_next_pair()
         x_arr = cur_x
-        y_arr = cur_y
+        y_arr = cur_y      
+        
+        add = np.repeat(-1, self.max_len_list - len(labels_list))
+        labels_list = np.hstack((labels_list, add))
+        
+        labels_lists = labels_list
         for sample_num in range(batch_size - 1):
-            (cur_x, cur_y) = self.get_next_pair()
+            (cur_x, cur_y, labels_list) = self.get_next_pair()
             x_arr = np.vstack((x_arr, cur_x))
             y_arr = np.append(y_arr, cur_y)
+            
+            add = np.repeat(-1, self.max_len_list - len(labels_list))
+            labels_list = np.hstack((labels_list, add))
+        
+            labels_lists = np.vstack((labels_lists, labels_list))
             gc.collect()
         
         set_features = theano.shared(np.asarray(x_arr, dtype=theano.config.floatX),
                                      borrow=True)
         set_labels = T.cast(theano.shared(np.asarray(y_arr, dtype=theano.config.floatX),
                                      borrow=True), 'int32')
-        return (set_features, set_labels)
+        set_labels_lists = T.cast(theano.shared(np.asarray(labels_lists, dtype=theano.config.floatX),
+                                     borrow=True), 'int32')
+        return (set_features, set_labels, set_labels_lists)
         
     def get_next_doc_vector(self):
         next_doc = self.w2vmodel.get_next_doc()

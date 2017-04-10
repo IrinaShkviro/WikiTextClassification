@@ -188,6 +188,7 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
  
     x = T.matrix('x')   # the data is presented as vectors
     y = T.ivector('y')  # the labels are presented as int labels
+    y_list = T.imatrix('y_list')  # labels list, presented as vectors
 
     ######################
     # BUILD ACTUAL MODEL #
@@ -255,13 +256,13 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
 
     # create a function to compute the mistakes that are made by the model
     test_model = theano.function(
-        [x, y],
-        cnn_4.layer3.errors(y)
+        [x, y_list],
+        cnn_4.layer3.errors(y_list)
     )
 
     validate_model = theano.function(
-        [x, y],
-        cnn_4.layer3.errors(y)
+        [x, y_list],
+        cnn_4.layer3.errors(y_list)
     )
 
     # create a list of all model parameters to be fit by gradient descent
@@ -338,8 +339,8 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
                         borrow=True,
                         return_internal_type=True
                     )
-                    valid_labels = next_valid_batch[1].eval()
-                    validation_losses.append(validate_model(valid_features, valid_labels))
+                    labels_list = next_train_batch[2].eval()
+                    validation_losses.append(validate_model(valid_features, labels_list))
                     
                 this_validation_loss = numpy.mean(validation_losses)
                 
@@ -373,8 +374,8 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
                             borrow=True,
                             return_internal_type=True
                         )
-                        test_labels = next_test_batch[1].eval()
-                        test_losses.append(test_model(test_features, test_labels))
+                        labels_list = next_train_batch[2].eval()
+                        test_losses.append(test_model(test_features, labels_list))
 
                     test_score = numpy.mean(test_losses)
                     
