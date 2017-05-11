@@ -6,7 +6,11 @@ Created on Wed Feb  8 12:54:29 2017
 """
 
 import os
+import sys
 import numpy as np
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
+from nltk.tokenize import RegexpTokenizer
 
 '''
 class DocIterator is iterator class for access to docs from dirs on disk
@@ -25,13 +29,15 @@ get_next_doc_id()
 
 class DocIterator(object):
     def __init__(self, dir_name):
-        self.dir_name = dir_name
-        self.doc_list = os.listdir(self.dir_name)
+        self.doc_folder = dir_name
+        self.doc_list = os.listdir(self.doc_folder)
         self.n_files = len(self.doc_list)
         self.cur_doc_num = 0
+        self.lemmatizer = WordNetLemmatizer()
         # remove common words and tokenize
-        self.stoplist = set('for a of the and to in'.split())
-        self.punctuation = set(', . : ; ! ? " ( ) [ ] { } # & ^ \ | / $'.split()) 
+        self.tokenizer = RegexpTokenizer(r'\w+')
+        self.stoplist = stopwords.words('english')
+        #self.punctuation = set(', . : ; ! ? " ( ) [ ] { } # & ^ \ | / $'.split()) 
         
     def get_next_doc_id(self):
         fname = self.doc_list[self.cur_doc_num]
@@ -44,14 +50,9 @@ class DocIterator(object):
         
     def get_word_list_by_name(self, fname):
         doc_word_list = []
-        for line in open(os.path.join(self.dir_name, fname)):
-            word_list = [word for word in line.lower().split() if word not in self.stoplist]
-                
-            for word_num in np.arange(len(word_list), dtype = int):
-                word = word_list[word_num]
-                for punct in self.punctuation:
-                    word = word.replace(punct, "")
-                word_list[word_num] = word
+        for line in open(os.path.join(self.doc_folder, fname)):
+            tokens = self.tokenizer.tokenize(line.lower())
+            word_list = [self.lemmatizer.lemmatize(word) for word in tokens if word not in self.stoplist]
             doc_word_list.extend(word_list)
                         
         return doc_word_list
@@ -73,3 +74,11 @@ class DocIterator(object):
         end = fname.find('.')
         doc_id = fname[3:end]
         return (self.get_word_list_by_name(fname), doc_id)
+        
+    def calc_total_words(self):
+        total_words = 0
+        for cur_doc in range(self.n_files):
+            total_words = total_words + len(self.get_next_doc()[0]) 
+            sys.stdout.write("%i / %i \r" % (cur_doc, self.n_files))
+        print('total words: ', total_words)
+        return total_words
