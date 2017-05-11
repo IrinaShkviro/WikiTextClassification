@@ -26,7 +26,7 @@ if not os.path.isdir(dir_name):
     os.mkdir(dir_name)
 
 # get an iterable
-context = ET.iterparse("enwiki-20161101-pages-meta-current.xml", events=("start", "end"))
+context = ET.iterparse("enwiki-20170320-pages-articles.xml", events=("start", "end"))
 #context = ET.iterparse("1.xml", events=("start", "end"))
 
 start_page = False

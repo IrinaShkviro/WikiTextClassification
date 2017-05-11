@@ -5,20 +5,20 @@ Created on Mon Jan 30 10:27:14 2017
 @author: Admin
 """
 
-#import pymysql as mysql
+import pymysql as mysql
 import numpy as np
 import os
 import pickle
 import sys
 
 from pprint import pprint
-import mysql.connector
+#import mysql.connector
 '''
 cnx = mysql.connector.connect(user='root', password='DbMysqlP@ss2016',
                               host='195.19.233.35',port=33061,
                               database='wiki')
 '''
-cnx = mysql.connector.connect(user='root', password='DbMysqlP@ss2016',
+cnx = mysql.connect(user='root', password='DbMysqlP@ss2016',
                               host='localhost',port=3306,
                               database='wiki')
                               

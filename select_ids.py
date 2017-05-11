@@ -11,7 +11,7 @@ import numpy as np
 from pprint import pprint
 
 cnx = mysql.connect(user='root', password='DbMysqlP@ss2016',
-                              host='195.19.233.35',port=33061,
+                              host='localhost', port=3306,
                               database='wiki')
 
 curs = cnx.cursor()
