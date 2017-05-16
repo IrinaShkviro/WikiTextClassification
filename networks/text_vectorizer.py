@@ -11,12 +11,12 @@ import gc
 
 import theano
 import theano.tensor as T
+import gensim
 
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import ExtraTreesClassifier
 
-from word2vec_wrapper import Word2VecWrapper
-os.chdir('..')
+from doc_iterator import DocIterator
 
 '''
 class text_vectorizer is class for transformation from docs to vectors 
@@ -54,21 +54,30 @@ get_doc_vector_by_id(doc_id)
 '''
 
 class TextVectorizer(object):
-    def __init__(self, vectorizer, vocab_dir = 'preproceed', train_dir = 'preproceed'):
-        self.w2vmodel = Word2VecWrapper(
-            vocab_dir = vocab_dir,
-            train_dir = train_dir
-        )
-        self.w2vmodel.tune_model()
-        self.vectorizer = vectorizer(self.w2vmodel)
-        self.n_files = self.w2vmodel.train_docs.n_files
-        self.dim = self.w2vmodel.dim
+    def __init__(self, vectorizer, train_dir = 'preproceed'):
+        this_folder = os.path.dirname(os.path.abspath(__file__))
+        self.train_dir = os.path.join(this_folder, '../' + train_dir)
+        self.train_docs = DocIterator(self.train_dir) # a memory-friendly iterator
+        self.saved_dir = os.path.join(this_folder, '../saved')
         
-        os.chdir('saved')
+        #load the data    
+        os.chdir(self.saved_dir)
+        # load w2v model
+        self.w2v_model = gensim.models.Word2Vec.load('w2v_model')
+        # load w2v dictionary
+        w2v_dict_file = open('w2v_dict', 'rb')
+        self.w2v_dict = pickle.load(w2v_dict_file)
+        w2v_dict_file.close()   
+        # load the train set
         train_file = open('train_data', 'rb')
         self.train_dict = pickle.load(train_file)
-        os.chdir('..')
+        train_file.close()
+        os.chdir('../networks')
         
+        self.dim = self.w2v_model.layer1_size
+        self.vectorizer = vectorizer(self.w2v_dict, self.dim)
+        self.n_files = self.train_docs.n_files
+                
         self.cur_x = []
         self.cur_label_list = []
         self.cur_label_num = 0
@@ -79,7 +88,7 @@ class TextVectorizer(object):
     def calc_n_samples(self):
         n_samples = 0
         for cur_doc in range(self.n_files):
-            cur_doc_id = self.w2vmodel.get_next_doc_id()
+            cur_doc_id = self.train_docs.get_next_doc_id()
             cur_label_list = self.train_dict.get(cur_doc_id)
             n_cur_labels = len(cur_label_list)
             if n_cur_labels > self.max_len_list:
@@ -130,7 +139,7 @@ class TextVectorizer(object):
         return (set_features, set_labels, set_labels_lists)
         
     def get_next_doc_vector(self):
-        next_doc = self.w2vmodel.get_next_doc()
+        next_doc = self.train_docs.get_next_doc()
         return (self.vectorizer.transform_one_list(next_doc[0]), next_doc[1])
         
     def get_next_vector_batch(self, batch_size):
@@ -140,4 +149,4 @@ class TextVectorizer(object):
         return arr
         
     def get_doc_vector_by_id(self, doc_id):
-        return self.vectorizer.transform_one_list(self.w2vmodel.get_word_list_by_id(doc_id))
+        return self.vectorizer.transform_one_list(self.train_docs.get_word_list_by_id(doc_id))

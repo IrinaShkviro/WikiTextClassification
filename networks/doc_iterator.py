@@ -73,6 +73,7 @@ class DocIterator(object):
             self.cur_doc_num = 0
         end = fname.find('.')
         doc_id = fname[3:end]
+        sys.stdout.write("%i / %i \r" % (self.cur_doc_num, self.n_files))
         return (self.get_word_list_by_name(fname), doc_id)
         
     def calc_total_words(self):

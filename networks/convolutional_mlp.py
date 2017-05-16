@@ -37,9 +37,9 @@ import theano.tensor as T
 from theano.tensor.signal import pool
 from theano.tensor.nnet import conv2d
 
-from logistic_sgd import LogisticRegression, load_data
+from logistic_sgd import LogisticRegression, load_data, save_model
 from calc_n_labels import calc_n_labels
-from networks.mlp import HiddenLayer
+from mlp import HiddenLayer
 
 
 class LeNetConvPoolLayer(object):
@@ -161,27 +161,17 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
     print(n_labels, 'n labels')
     
     train_vectorizer = load_data(
-        vocab_dir = 'preproceed',
-        train_dir = 'preproceed'
-    )
-    
-    valid_vectorizer = load_data(
-        vocab_dir = 'preproceed',
-        train_dir = 'preproceed'
+        train_dir = 'train_set'
     )
     
     test_vectorizer = load_data(
-        vocab_dir = 'preproceed',
-        train_dir = 'preproceed'
+        train_dir = 'test_set'
     )
 
-    # compute number of batches for training, validating and testing
+    # compute number of batches for training and testing
     (n_train_batches, n_last_train_batch) = divmod(train_vectorizer.calc_n_samples(), batch_size)
     if (n_last_train_batch > 0):
         n_train_batches = n_train_batches + 1
-    (n_valid_batches, n_last_valid_batch) = divmod(valid_vectorizer.calc_n_samples(), batch_size) 
-    if (n_last_valid_batch > 0):
-        n_valid_batches = n_valid_batches + 1
     (n_test_batches, n_last_test_batch) = divmod(test_vectorizer.calc_n_samples(), batch_size)   
     if (n_last_test_batch > 0):
         n_test_batches = n_test_batches + 1
@@ -260,11 +250,6 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
         cnn_4.layer3.errors(y_list)
     )
 
-    validate_model = theano.function(
-        [x, y_list],
-        cnn_4.layer3.errors(y_list)
-    )
-
     # create a list of all model parameters to be fit by gradient descent
     params = cnn_4.layer3.params + cnn_4.layer2.params + cnn_4.layer1.params + cnn_4.layer0.params
 
@@ -297,13 +282,13 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
                            # found
     improvement_threshold = 0.995  # a relative improvement of this much is
                                    # considered significant
-    validation_frequency = min(n_train_batches, patience // 2)
+    test_frequency = min(n_train_batches, patience // 2)
                                   # go through this many
                                   # minibatche before checking the network
                                   # on the validation set; in this case we
                                   # check every epoch
 
-    best_validation_loss = numpy.inf
+    best_test_loss = numpy.inf
     best_iter = 0
     train_arr = []
     test_score = 0.
@@ -312,8 +297,10 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
     epoch = 0
     done_looping = False
 
+    file_name = "cnn_log.txt"
     while (epoch < n_epochs) and (not done_looping):
         epoch = epoch + 1
+        sys.stdout.write("%i / %i \n" % (epoch, n_epochs))
         for batch_id in range(n_train_batches):
             
             next_train_batch = train_vectorizer.get_next_batch(batch_size = batch_size)
@@ -323,26 +310,27 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
             )
             train_labels = next_train_batch[1].eval()
             batch_avg_cost = train_model(train_features, train_labels)
+            
+            f = open(file_name, 'w')
+            f.write(str(batch_avg_cost) + '\n')
+            f.close()
 
             iter = (epoch - 1) * n_train_batches + batch_id
             train_arr.append((iter, batch_avg_cost))
 
-            if iter % 100 == 0:
-                print('training iter = ', iter)      
-
-            if (iter + 1) % validation_frequency == 0:
+            if (iter + 1) % test_frequency == 0:
                 # compute zero-one loss on validation set
-                validation_losses = []
-                for cur_valid_batch in range(n_valid_batches):
-                    next_valid_batch = valid_vectorizer.get_next_batch(batch_size = batch_size)
-                    valid_features = next_valid_batch[0].get_value(
+                test_losses = []
+                for cur_test_batch in range(n_test_batches):
+                    next_test_batch = test_vectorizer.get_next_batch(batch_size = batch_size)
+                    test_features = next_test_batch[0].get_value(
                         borrow=True,
                         return_internal_type=True
                     )
-                    labels_list = next_train_batch[2].eval()
-                    validation_losses.append(validate_model(valid_features, labels_list))
+                    labels_list = next_test_batch[2].eval()
+                    test_losses.append(test_model(test_features, labels_list))
                     
-                this_validation_loss = numpy.mean(validation_losses)
+                this_test_loss = numpy.mean(test_losses)
                 
                 print(
                     'epoch %i, batch %i/%i, validation error %f %%' %
@@ -350,34 +338,21 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
                         epoch,
                         batch_id + 1,
                         n_train_batches,
-                        this_validation_loss * 100.
+                        this_test_loss * 100.
                     )
                 )
 
                 # if we got the best validation score until now
-                if this_validation_loss < best_validation_loss:
+                if this_test_loss < best_test_loss:
 
                     #improve patience if loss improvement is good enough
-                    if this_validation_loss < best_validation_loss *  \
+                    if this_test_loss < best_test_loss *  \
                        improvement_threshold:
                         patience = max(patience, iter * patience_increase)
 
                     # save best validation score and iteration number
-                    best_validation_loss = this_validation_loss
+                    best_test_loss = this_test_loss
                     best_iter = iter
-
-                    # test it on the test set
-                    test_losses = []
-                    for cur_test_batch in range(n_test_batches):
-                        next_test_batch = test_vectorizer.get_next_batch(batch_size = batch_size)
-                        test_features = next_test_batch[0].get_value(
-                            borrow=True,
-                            return_internal_type=True
-                        )
-                        labels_list = next_train_batch[2].eval()
-                        test_losses.append(test_model(test_features, labels_list))
-
-                    test_score = numpy.mean(test_losses)
                     
                     print(
                         (
@@ -388,13 +363,12 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
                             epoch,
                             batch_id + 1,
                             n_train_batches,
-                            test_score * 100.
+                            this_test_loss * 100.
                         )
                     )
                     
                     # save the best model
-                    with open('best_model_cnn_4.pkl', 'wb') as f:
-                        pickle.dump(cnn_4, f)
+                    save_model(model = cnn_4, filename = 'best_model_log_reg.pkl')
 
             if patience <= iter:
                 done_looping = True
@@ -404,7 +378,7 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
     print('Optimization complete.')
     print('Best validation score of %f %% obtained at iteration %i, '
           'with test performance %f %%' %
-          (best_validation_loss * 100., best_iter + 1, test_score * 100.))
+          (best_test_loss * 100., best_iter + 1, test_score * 100.))
     print(('The code for file ' +
            os.path.split(__file__)[1] +
            ' ran for %.2fm' % ((end_time - start_time) / 60.)), file=sys.stderr)
