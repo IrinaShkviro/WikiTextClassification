@@ -134,7 +134,19 @@ class CNN_4_levels(object):
          # layer3 is classifier (logistic regression)
          self.layer3 = layer3
         
-         
+ 
+def load_model(filename, dir_name = 'saved'):
+    this_folder = os.path.dirname(os.path.abspath(__file__))
+    saved_folder = os.path.join(this_folder, 'saved')
+    os.chdir(saved_folder)
+    
+    file = open(filename, 'rb')
+    # load the saved model
+    model = pickle.load(file)
+    file.close()
+    os.chdir('..')
+    return model
+        
 
 def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
                     dataset='mnist.pkl.gz',
@@ -368,7 +380,7 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
                     )
                     
                     # save the best model
-                    save_model(model = cnn_4, filename = 'best_model_log_reg.pkl')
+                    save_model(model = cnn_4, filename = 'best_model_cnn.pkl')
 
             if patience <= iter:
                 done_looping = True

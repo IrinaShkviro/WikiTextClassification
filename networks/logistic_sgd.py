@@ -191,8 +191,11 @@ def save_model(model, filename, dir_name = 'saved'):
     os.chdir('..')
 
 def load_model(filename, dir_name = 'saved'):
-    os.chdir(dir_name)
-    file = open(filename, 'wb')
+    this_folder = os.path.dirname(os.path.abspath(__file__))
+    saved_folder = os.path.join(this_folder, 'saved')
+    os.chdir(saved_folder)
+    
+    file = open(filename, 'rb')
     # load the saved model
     model = pickle.load(file)
     file.close()
@@ -259,7 +262,7 @@ def sgd_optimization(learning_rate=0.13, n_epochs=1000,
     # the model on a minibatch
     test_model = theano.function(
         inputs = [x, y_list],
-        outputs = classifier.errors(y_list),
+        outputs = classifier.errors(y_list)
     )
 
     # compute the gradient of cost with respect to theta = (W,b)
